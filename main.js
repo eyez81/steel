@@ -348,7 +348,6 @@ let selectedThickness = '';
 let length = 1;
 let results = [];
 
-// שלב 1: בחירת קטגוריה
 function renderCategorySelection() {
   const categories = Object.keys(steelData);
   app.innerHTML = `
@@ -370,7 +369,6 @@ function renderCategorySelection() {
   });
 }
 
-// שלב 2: בחירת פרופיל, עובי, אורך
 function renderProfileChooser() {
   if (!selectedCategory) {
     document.getElementById('profile-chooser').innerHTML = '';
@@ -379,11 +377,54 @@ function renderProfileChooser() {
 
   const data = steelData[selectedCategory];
 
-  // בדיקה אם יש עוביים
+  // קטגוריה עם items (HEA, HEB, וכו׳)
+  if (data.items) {
+    document.getElementById('profile-chooser').innerHTML = `
+      <div>
+        <label>גודל:</label>
+        <select id="size">
+          <option value="">-- בחר --</option>
+          ${data.items.map((item, idx) => `<option value="${idx}">${item.size}</option>`).join('')}
+        </select>
+        <label>אורך (מטר):</label>
+        <input type="number" min="0.01" step="0.01" id="length" value="1">
+        <button id="add">הוסף</button>
+      </div>
+    `;
+    document.getElementById('size').addEventListener('change', function() {
+      selectedSize = this.value;
+    });
+    document.getElementById('length').addEventListener('input', function() {
+      length = parseFloat(this.value) || 1;
+    });
+    document.getElementById('add').onclick = function() {
+      const idx = parseInt(selectedSize, 10);
+      if (isNaN(idx)) {
+        alert('בחר גודל');
+        return;
+      }
+      const item = data.items[idx];
+      if (!item) {
+        alert('שגיאה');
+        return;
+      }
+      const totalWeight = +(item.weight * length).toFixed(2);
+      results.push({
+        category: data.name,
+        size: item.size,
+        thickness: item.thickness || '-',
+        length,
+        weightPerMeter: item.weight,
+        totalWeight
+      });
+      renderResults();
+    };
+    return;
+  }
+
+  // קטגוריה עם weights (צינורות, ריבועי, מלבני, שטוח, פחים)
   const hasThickness = data.weights && Object.keys(data.weights).length > 1;
   const thicknessOptions = hasThickness ? Object.keys(data.weights) : [];
-
-  // גדלים אפשריים
   const sizes = data.sizes || [];
 
   document.getElementById('profile-chooser').innerHTML = `
@@ -423,51 +464,33 @@ function renderProfileChooser() {
     length = parseFloat(this.value) || 1;
   });
 
-  document.getElementById('add').onclick = addResult;
-}
-
-// שלב 3: חישוב הוספה והצגת התוצאות
-function addResult() {
-  const data = steelData[selectedCategory];
-  const hasThickness = data.weights && Object.keys(data.weights).length > 1;
-  const sizeIdx = parseInt(selectedSize, 10);
-
-  if (!selectedCategory || isNaN(sizeIdx) || (hasThickness && !selectedThickness)) {
-    alert('יש לבחור קטגוריה, גודל (ועובי אם רלוונטי).');
-    return;
-  }
-
-  let weightPerMeter = null;
-  let sizeLabel = '';
-  let thicknessLabel = '';
-
-  if (hasThickness) {
-    weightPerMeter = data.weights[selectedThickness][sizeIdx];
-    thicknessLabel = selectedThickness;
-  } else {
-    // חישוב לקטגוריה ללא עוביים
-    weightPerMeter = data.weights[Object.keys(data.weights)[0]][sizeIdx];
-  }
-
-  sizeLabel = data.sizes[sizeIdx];
-
-  if (!weightPerMeter) {
-    alert('אין נתון משקל לפרופיל שבחרת.');
-    return;
-  }
-
-  const totalWeight = +(weightPerMeter * length).toFixed(2);
-
-  results.push({
-    category: steelData[selectedCategory].name,
-    size: sizeLabel,
-    thickness: thicknessLabel,
-    length,
-    weightPerMeter,
-    totalWeight
-  });
-
-  renderResults();
+  document.getElementById('add').onclick = function() {
+    const sizeIdx = parseInt(selectedSize, 10);
+    if (isNaN(sizeIdx) || (hasThickness && !selectedThickness)) {
+      alert('בחר גודל (ועובי אם צריך)');
+      return;
+    }
+    let weightPerMeter = null;
+    if (hasThickness) {
+      weightPerMeter = data.weights[selectedThickness][sizeIdx];
+    } else {
+      weightPerMeter = data.weights[Object.keys(data.weights)[0]][sizeIdx];
+    }
+    if (!weightPerMeter) {
+      alert('אין נתון משקל לפרופיל שבחרת.');
+      return;
+    }
+    const totalWeight = +(weightPerMeter * length).toFixed(2);
+    results.push({
+      category: data.name,
+      size: data.sizes[sizeIdx],
+      thickness: hasThickness ? selectedThickness : '-',
+      length,
+      weightPerMeter,
+      totalWeight
+    });
+    renderResults();
+  };
 }
 
 function renderResults() {
@@ -475,7 +498,6 @@ function renderResults() {
     document.getElementById('results').innerHTML = '';
     return;
   }
-
   let sum = results.reduce((a, b) => a + b.totalWeight, 0);
 
   document.getElementById('results').innerHTML = `
@@ -513,10 +535,9 @@ function renderResults() {
     </div>
   `;
 }
-
 window.removeResult = function(idx) {
   results.splice(idx, 1);
   renderResults();
 };
-
 renderCategorySelection();
+
