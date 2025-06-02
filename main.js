@@ -341,41 +341,182 @@ const steelData = {
   }
 };
 const app = document.getElementById('app');
-const categories = Object.keys(steelData);
 
-function renderCategories() {
+let selectedCategory = null;
+let selectedSize = '';
+let selectedThickness = '';
+let length = 1;
+let results = [];
+
+// שלב 1: בחירת קטגוריה
+function renderCategorySelection() {
+  const categories = Object.keys(steelData);
   app.innerHTML = `
-    <h1>בחר קטגוריית פרופיל</h1>
-    <div>
-      ${categories.map(cat =>
-        `<button onclick="showCategory('${cat}')">${steelData[cat].name}</button>`
-      ).join(' ')}
+    <h1>מחשבון משקל פרופילי ברזל</h1>
+    <div style="margin-bottom:1rem">
+      <label>בחר קטגוריה:</label>
+      <select id="category">
+        <option value="">-- בחר --</option>
+        ${categories.map(cat => `<option value="${cat}">${steelData[cat].name}</option>`).join('')}
+      </select>
     </div>
-    <div id="category-content"></div>
+    <div id="profile-chooser"></div>
+    <div id="results"></div>
+  `;
+
+  document.getElementById('category').addEventListener('change', function() {
+    selectedCategory = this.value;
+    renderProfileChooser();
+  });
+}
+
+// שלב 2: בחירת פרופיל, עובי, אורך
+function renderProfileChooser() {
+  if (!selectedCategory) {
+    document.getElementById('profile-chooser').innerHTML = '';
+    return;
+  }
+
+  const data = steelData[selectedCategory];
+
+  // בדיקה אם יש עוביים
+  const hasThickness = data.weights && Object.keys(data.weights).length > 1;
+  const thicknessOptions = hasThickness ? Object.keys(data.weights) : [];
+
+  // גדלים אפשריים
+  const sizes = data.sizes || [];
+
+  document.getElementById('profile-chooser').innerHTML = `
+    <div style="display:flex;gap:1rem;flex-wrap:wrap;align-items:flex-end">
+      <div>
+        <label>גודל:</label>
+        <select id="size">
+          <option value="">-- בחר --</option>
+          ${sizes.map((sz, idx) => `<option value="${idx}">${sz}</option>`).join('')}
+        </select>
+      </div>
+      ${hasThickness ? `
+      <div>
+        <label>עובי (מ"מ):</label>
+        <select id="thickness">
+          <option value="">-- בחר --</option>
+          ${thicknessOptions.map(t => `<option value="${t}">${t}</option>`).join('')}
+        </select>
+      </div>` : ''}
+      <div>
+        <label>אורך (מטר):</label>
+        <input type="number" min="0.01" step="0.01" id="length" value="1">
+      </div>
+      <button id="add">הוסף</button>
+    </div>
+  `;
+
+  document.getElementById('size').addEventListener('change', function() {
+    selectedSize = this.value;
+  });
+  if (hasThickness) {
+    document.getElementById('thickness').addEventListener('change', function() {
+      selectedThickness = this.value;
+    });
+  }
+  document.getElementById('length').addEventListener('input', function() {
+    length = parseFloat(this.value) || 1;
+  });
+
+  document.getElementById('add').onclick = addResult;
+}
+
+// שלב 3: חישוב הוספה והצגת התוצאות
+function addResult() {
+  const data = steelData[selectedCategory];
+  const hasThickness = data.weights && Object.keys(data.weights).length > 1;
+  const sizeIdx = parseInt(selectedSize, 10);
+
+  if (!selectedCategory || isNaN(sizeIdx) || (hasThickness && !selectedThickness)) {
+    alert('יש לבחור קטגוריה, גודל (ועובי אם רלוונטי).');
+    return;
+  }
+
+  let weightPerMeter = null;
+  let sizeLabel = '';
+  let thicknessLabel = '';
+
+  if (hasThickness) {
+    weightPerMeter = data.weights[selectedThickness][sizeIdx];
+    thicknessLabel = selectedThickness;
+  } else {
+    // חישוב לקטגוריה ללא עוביים
+    weightPerMeter = data.weights[Object.keys(data.weights)[0]][sizeIdx];
+  }
+
+  sizeLabel = data.sizes[sizeIdx];
+
+  if (!weightPerMeter) {
+    alert('אין נתון משקל לפרופיל שבחרת.');
+    return;
+  }
+
+  const totalWeight = +(weightPerMeter * length).toFixed(2);
+
+  results.push({
+    category: steelData[selectedCategory].name,
+    size: sizeLabel,
+    thickness: thicknessLabel,
+    length,
+    weightPerMeter,
+    totalWeight
+  });
+
+  renderResults();
+}
+
+function renderResults() {
+  if (results.length === 0) {
+    document.getElementById('results').innerHTML = '';
+    return;
+  }
+
+  let sum = results.reduce((a, b) => a + b.totalWeight, 0);
+
+  document.getElementById('results').innerHTML = `
+    <h2>תוצאות</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>קטגוריה</th>
+          <th>גודל</th>
+          <th>עובי</th>
+          <th>אורך (מטר)</th>
+          <th>משקל למטר</th>
+          <th>משקל כולל</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        ${results.map((row, i) => `
+          <tr>
+            <td>${row.category}</td>
+            <td>${row.size}</td>
+            <td>${row.thickness || '-'}</td>
+            <td>${row.length}</td>
+            <td>${row.weightPerMeter}</td>
+            <td>${row.totalWeight}</td>
+            <td><button onclick="removeResult(${i})">מחק</button></td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+    <div class="summary-blocks">
+      <div class="summary-block">
+        <b>משקל כולל:</b><br>${sum.toFixed(2)} ק"ג
+      </div>
+    </div>
   `;
 }
 
-window.showCategory = function (cat) {
-  const data = steelData[cat];
-  let content = `<h2>${data.name}</h2>`;
-
-  if (data.items) {
-    content += '<ul>' + data.items.map(item =>
-      `<li>${item.size} - ${item.weight} ק"ג למטר</li>`
-    ).join('') + '</ul>';
-  } else if (data.sizes && data.weights) {
-    content += '<table><tr><th>גודל</th>' + Object.keys(data.weights).map(w => `<th>${w} מ"מ</th>`).join('') + '</tr>';
-    data.sizes.forEach((size, i) => {
-      content += `<tr><td>${size}</td>` +
-        Object.keys(data.weights).map(w => `<td>${data.weights[w][i] ?? '-'}</td>`).join('') +
-        '</tr>';
-    });
-    content += '</table>';
-  } else {
-    content += '<div>אין מידע להצגה</div>';
-  }
-
-  document.getElementById('category-content').innerHTML = content;
+window.removeResult = function(idx) {
+  results.splice(idx, 1);
+  renderResults();
 };
 
-renderCategories();
+renderCategorySelection();
