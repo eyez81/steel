@@ -343,9 +343,39 @@ const steelData = {
 const app = document.getElementById('app');
 const categories = Object.keys(steelData);
 
-app.innerHTML = `
-  <h1>בחר קטגוריית פרופיל</h1>
-  <ul>
-    ${categories.map(cat => `<li>${steelData[cat].name}</li>`).join('')}
-  </ul>
-`;
+function renderCategories() {
+  app.innerHTML = `
+    <h1>בחר קטגוריית פרופיל</h1>
+    <div>
+      ${categories.map(cat =>
+        `<button onclick="showCategory('${cat}')">${steelData[cat].name}</button>`
+      ).join(' ')}
+    </div>
+    <div id="category-content"></div>
+  `;
+}
+
+window.showCategory = function (cat) {
+  const data = steelData[cat];
+  let content = `<h2>${data.name}</h2>`;
+
+  if (data.items) {
+    content += '<ul>' + data.items.map(item =>
+      `<li>${item.size} - ${item.weight} ק"ג למטר</li>`
+    ).join('') + '</ul>';
+  } else if (data.sizes && data.weights) {
+    content += '<table><tr><th>גודל</th>' + Object.keys(data.weights).map(w => `<th>${w} מ"מ</th>`).join('') + '</tr>';
+    data.sizes.forEach((size, i) => {
+      content += `<tr><td>${size}</td>` +
+        Object.keys(data.weights).map(w => `<td>${data.weights[w][i] ?? '-'}</td>`).join('') +
+        '</tr>';
+    });
+    content += '</table>';
+  } else {
+    content += '<div>אין מידע להצגה</div>';
+  }
+
+  document.getElementById('category-content').innerHTML = content;
+};
+
+renderCategories();
