@@ -340,3 +340,12 @@ const steelData = {
     ]
   }
 };
+const app = document.getElementById('app');
+const categories = Object.keys(steelData);
+
+app.innerHTML = `
+  <h1>בחר קטגוריית פרופיל</h1>
+  <ul>
+    ${categories.map(cat => `<li>${steelData[cat].name}</li>`).join('')}
+  </ul>
+`;
