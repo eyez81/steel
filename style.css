@@ -48,25 +48,6 @@ input:disabled {
   background: #e0e0e0;
   color: #666;
 }
-.search-results {
-  background: #f9f9f9;
-  border: 1px solid #ddd;
-  max-height: 200px;
-  overflow-y: auto;
-  margin-bottom: 1rem;
-  border-radius: 6px;
-}
-.search-results > div {
-  padding: 8px 12px;
-  cursor: pointer;
-  border-bottom: 1px solid #eee;
-}
-.search-results > div:last-child {
-  border-bottom: none;
-}
-.search-results > div:hover {
-  background: #e0f7fa;
-}
 .summary-blocks {
   display: flex;
   gap: 2rem;
