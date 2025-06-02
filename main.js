@@ -342,189 +342,188 @@ const steelData = {
 };
 const app = document.getElementById('app');
 
-// מערך לשמירת הפריטים
+// יצירת אלמנטים עבור שדות קלט והוספה
+app.innerHTML = `
+  <h1>מחשבון משקל פרופילי ברזל</h1>
+  <div style="margin-bottom:2rem;">
+    <label>בחר קטגוריה:
+      <select id="category"></select>
+    </label>
+    <label>גודל:
+      <select id="size"></select>
+    </label>
+    <label>עובי (מ"מ):
+      <select id="thickness"></select>
+    </label>
+    <label>אורך (מטר):
+      <input type="number" id="length" min="0.01" value="1" style="width:60px">
+    </label>
+    <label>כמות:
+      <input type="number" id="qty" min="1" value="1" style="width:50px">
+    </label>
+    <button id="addItem">הוסף</button>
+  </div>
+  <div id="results"></div>
+  <div id="summary"></div>
+  <div style="margin:1rem 0;">
+    <button id="exportCSV">יצוא דוח (CSV)</button>
+  </div>
+`;
+
+// הכנה
 let items = [];
 
-// פונקציה ראשית להצגת בחירת קטגוריה
-function renderCategories() {
-  app.innerHTML = `
-    <h1>בחר קטגוריית פרופיל</h1>
-    <div>
-      ${Object.keys(steelData).map(cat =>
-        `<button onclick="showCategory('${cat}')">${steelData[cat].name}</button>`
-      ).join(' ')}
-    </div>
-    <div id="category-content"></div>
-    <div id="items-table"></div>
-    <div id="summary"></div>
-    <button id="exportBtn" style="margin-top:2rem;display:none">יצא דוח (CSV)</button>
-  `;
+const categorySelect = document.getElementById('category');
+const sizeSelect = document.getElementById('size');
+const thicknessSelect = document.getElementById('thickness');
+const lengthInput = document.getElementById('length');
+const qtyInput = document.getElementById('qty');
 
-  document.getElementById('exportBtn').onclick = function() {
-    exportToCSV();
-  };
+function getOptions(obj) {
+  return Object.entries(obj).map(([key, v]) => `<option value="${key}">${v.name}</option>`).join('');
 }
-window.showCategory = function(cat) {
+
+function renderSizes(cat) {
+  sizeSelect.innerHTML = '';
+  thicknessSelect.innerHTML = '<option value="">--בחר--</option>';
+  if (!cat) return;
   const data = steelData[cat];
-  let content = `<h2>${data.name}</h2>`;
-
+  // במבנה items (ללא עובי)
   if (data.items) {
-    content += `
-      <select id="size-select">
-        ${data.items.map((item, i) => `<option value="${i}">${item.size} - ${item.weight} ק"ג למטר</option>`).join('')}
-      </select>
-      <label>אורך (מטר): <input type="number" id="length" min="0.01" step="0.01" value="1"></label>
-      <label>כמות: <input type="number" id="qty" min="1" step="1" value="1"></label>
-      <button id="addBtn">הוסף לטבלה</button>
-    `;
-    content += `<button style="margin-right:8px" onclick="renderCategories()">חזרה</button>`;
-    document.getElementById('category-content').innerHTML = content;
-
-    document.getElementById('addBtn').onclick = function() {
-      const idx = Number(document.getElementById('size-select').value);
-      const length = Number(document.getElementById('length').value);
-      const qty = Number(document.getElementById('qty').value);
-      const item = data.items[idx];
-      const totalMeters = length * qty;
-      const totalWeight = totalMeters * item.weight;
-      items.push({
-        profile: data.name,
-        size: item.size,
-        length, qty,
-        weightPerMeter: item.weight,
-        totalMeters,
-        totalWeight
-      });
-      renderItemsTable();
-      renderSummary();
-      document.getElementById('exportBtn').style.display = 'inline-block';
-    };
-  } else if (data.sizes && data.weights) {
-    // דוגמה לפרופילים עם משקל משתנה לפי עובי
-    const thicknesses = Object.keys(data.weights);
-    content += `
-      <select id="size-select">
-        ${data.sizes.map((size, i) => `<option value="${i}">${size}</option>`).join('')}
-      </select>
-      <select id="thickness-select">
-        ${thicknesses.map(t => `<option value="${t}">${t} מ"מ</option>`).join('')}
-      </select>
-      <label>אורך (מטר): <input type="number" id="length" min="0.01" step="0.01" value="1"></label>
-      <label>כמות: <input type="number" id="qty" min="1" step="1" value="1"></label>
-      <button id="addBtn">הוסף לטבלה</button>
-    `;
-    content += `<button style="margin-right:8px" onclick="renderCategories()">חזרה</button>`;
-    document.getElementById('category-content').innerHTML = content;
-
-    document.getElementById('addBtn').onclick = function() {
-      const sizeIdx = Number(document.getElementById('size-select').value);
-      const thickness = document.getElementById('thickness-select').value;
-      const length = Number(document.getElementById('length').value);
-      const qty = Number(document.getElementById('qty').value);
-      const weightPerMeter = data.weights[thickness][sizeIdx];
-      if (weightPerMeter == null) {
-        alert('אין נתון עבור השילוב הזה.');
-        return;
-      }
-      const totalMeters = length * qty;
-      const totalWeight = totalMeters * weightPerMeter;
-      items.push({
-        profile: data.name,
-        size: data.sizes[sizeIdx] + ` (${thickness} מ"מ)`,
-        length, qty,
-        weightPerMeter,
-        totalMeters,
-        totalWeight
-      });
-      renderItemsTable();
-      renderSummary();
-      document.getElementById('exportBtn').style.display = 'inline-block';
-    };
-  } else {
-    document.getElementById('category-content').innerHTML = '<div>אין מידע להצגה</div>';
+    sizeSelect.innerHTML = data.items.map((it, i) => `<option value="${i}">${it.size}</option>`).join('');
+    thicknessSelect.disabled = true;
+  }
+  // מבנה עם thickness
+  else if (data.sizes && data.weights) {
+    sizeSelect.innerHTML = data.sizes.map((sz, i) => `<option value="${i}">${sz}</option>`).join('');
+    thicknessSelect.innerHTML = '<option value="">--בחר--</option>' + Object.keys(data.weights).map(w => `<option value="${w}">${w}</option>`).join('');
+    thicknessSelect.disabled = false;
   }
 }
 
-// טבלת הפריטים + עריכה
-function renderItemsTable() {
-  const tableDiv = document.getElementById('items-table');
-  if (items.length === 0) {
-    tableDiv.innerHTML = "";
-    document.getElementById('exportBtn').style.display = 'none';
+categorySelect.innerHTML = getOptions(steelData);
+renderSizes(categorySelect.value);
+categorySelect.addEventListener('change', () => renderSizes(categorySelect.value));
+
+function getSelectedItem() {
+  const cat = categorySelect.value;
+  const sizeIdx = sizeSelect.value;
+  const thickness = thicknessSelect.value;
+  const length = Number(lengthInput.value);
+  const qty = Number(qtyInput.value);
+
+  const data = steelData[cat];
+  let size, weight;
+  if (data.items) {
+    size = data.items[sizeIdx].size;
+    weight = data.items[sizeIdx].weight;
+  } else if (data.sizes && data.weights) {
+    size = data.sizes[sizeIdx];
+    weight = data.weights[thickness][sizeIdx];
+  }
+  return { category: data.name, cat, size, thickness, length, qty, weightPerMeter: weight };
+}
+
+// הוספת פריט
+document.getElementById('addItem').onclick = function () {
+  const sel = getSelectedItem();
+  if (!sel.size || !sel.weightPerMeter || !sel.length || !sel.qty) return alert('יש למלא את כל השדות');
+  items.push({
+    ...sel,
+    totalMeters: sel.length * sel.qty,
+    totalWeight: sel.weightPerMeter * sel.length * sel.qty
+  });
+  renderTable();
+  renderSummary();
+};
+
+// עריכה אחרי הוספה
+window.editItem = function (idx, field, val) {
+  val = Number(val);
+  items[idx][field] = val;
+  // עדכון חישובים
+  items[idx].totalMeters = items[idx].length * items[idx].qty;
+  items[idx].totalWeight = items[idx].weightPerMeter * items[idx].totalMeters;
+  renderTable();
+  renderSummary();
+};
+
+window.deleteItem = function (idx) {
+  items.splice(idx, 1);
+  renderTable();
+  renderSummary();
+};
+
+function renderTable() {
+  if (!items.length) {
+    document.getElementById('results').innerHTML = '';
     return;
   }
-  tableDiv.innerHTML = `
+  let html = `
     <table>
-      <tr>
-        <th>פרופיל</th>
-        <th>גודל</th>
-        <th>אורך (מ')</th>
-        <th>כמות</th>
-        <th>סה"כ מטר</th>
-        <th>ק"ג למטר</th>
-        <th>סה"כ משקל (ק"ג)</th>
-        <th>עריכה</th>
-        <th>מחיקה</th>
-      </tr>
-      ${items.map((item, i) => `
+      <thead>
         <tr>
-          <td>${item.profile}</td>
-          <td>${item.size}</td>
-          <td><input type="number" min="0.01" step="0.01" value="${item.length}" onchange="editItem(${i},'length',this.value)"></td>
-          <td><input type="number" min="1" step="1" value="${item.qty}" onchange="editItem(${i},'qty',this.value)"></td>
-          <td>${item.totalMeters.toFixed(2)}</td>
-          <td>${item.weightPerMeter}</td>
-          <td>${item.totalWeight.toFixed(2)}</td>
-          <td><button onclick="editRow(${i})">עדכן</button></td>
-          <td><button onclick="deleteItem(${i})">מחק</button></td>
+          <th>קטגוריה</th>
+          <th>גודל</th>
+          <th>עובי</th>
+          <th>אורך (מטר)</th>
+          <th>כמות</th>
+          <th>סה"כ מטר</th>
+          <th>ק"ג למטר</th>
+          <th>סה"כ משקל (ק"ג)</th>
+          <th>פעולות</th>
         </tr>
-      `).join('')}
+      </thead>
+      <tbody>
+        ${items.map((it, i) => `
+          <tr>
+            <td>${it.category}</td>
+            <td>${it.size}</td>
+            <td>${it.thickness || '-'}</td>
+            <td><input type="number" value="${it.length}" min="0.01" style="width:60px" onchange="editItem(${i}, 'length', this.value)"></td>
+            <td><input type="number" value="${it.qty}" min="1" style="width:50px" onchange="editItem(${i}, 'qty', this.value)"></td>
+            <td>${it.totalMeters.toFixed(2)}</td>
+            <td>${it.weightPerMeter}</td>
+            <td>${it.totalWeight.toFixed(2)}</td>
+            <td><button onclick="deleteItem(${i})">מחק</button></td>
+          </tr>
+        `).join('')}
+      </tbody>
     </table>
   `;
-  window.deleteItem = function(i) {
-    items.splice(i, 1);
-    renderItemsTable();
-    renderSummary();
-  };
-  window.editItem = function(i, field, value) {
-    value = Number(value);
-    items[i][field] = value;
-    items[i].totalMeters = items[i].length * items[i].qty;
-    items[i].totalWeight = items[i].totalMeters * items[i].weightPerMeter;
-    renderItemsTable();
-    renderSummary();
-  };
+  document.getElementById('results').innerHTML = html;
 }
 
-// סיכום בסוף
 function renderSummary() {
-  const numItems = items.length;
-  const totalWeight = items.reduce((s, x) => s + x.totalWeight, 0);
+  const totalItems = items.length;
+  const totalWeight = items.reduce((sum, i) => sum + i.totalWeight, 0);
   const totalTons = totalWeight / 1000;
   document.getElementById('summary').innerHTML = `
     <div class="summary-blocks">
-      <div class="summary-block">פריטים: ${numItems}</div>
+      <div class="summary-block">מס' פריטים: ${totalItems}</div>
       <div class="summary-block">סה"כ משקל: ${totalWeight.toFixed(2)} ק"ג</div>
-      <div class="summary-block">סה"כ טון: ${totalTons.toFixed(3)} טון</div>
+      <div class="summary-block">סה"כ: ${totalTons.toFixed(3)} טון</div>
     </div>
   `;
 }
 
-// ייצוא ל־CSV
-function exportToCSV() {
-  const headers = ["פרופיל", "גודל", "אורך (מ')", "כמות", "סה\"כ מטר", "ק\"ג למטר", "סה\"כ משקל (ק\"ג)"];
-  const rows = items.map(item => [
-    item.profile, item.size, item.length, item.qty, item.totalMeters, item.weightPerMeter, item.totalWeight
-  ]);
-  const csv = [headers, ...rows].map(row => row.join(",")).join("\n");
-  const blob = new Blob([csv], { type: "text/csv" });
+// יצוא ל־CSV
+document.getElementById('exportCSV').onclick = function () {
+  if (!items.length) return alert('אין פריטים ליצוא');
+  const headers = ['קטגוריה', 'גודל', 'עובי', 'אורך', 'כמות', 'סה"כ מטר', 'ק"ג למטר', 'סה"כ משקל (ק"ג)'];
+  const rows = items.map(it => [it.category, it.size, it.thickness || '-', it.length, it.qty, it.totalMeters, it.weightPerMeter, it.totalWeight]);
+  const csv = [headers, ...rows].map(r => r.join(',')).join('\n');
+  const blob = new Blob([csv], { type: 'text/csv' });
   const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
+  const a = document.createElement('a');
   a.href = url;
-  a.download = "steel_report.csv";
+  a.download = 'steel_report.csv';
   a.click();
   URL.revokeObjectURL(url);
-}
+};
 
-// הצג טופס ראשי
-renderCategories();
+// ראשוני
+renderSizes(categorySelect.value);
+renderTable();
+renderSummary();
+
